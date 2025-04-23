@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UMIT Timetable Generator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>UMIT Timetable Generator</h1>
+      <div class="header-buttons">
+        <button id="generateBtn" class="primary-button">Generate New Timetable</button>
+        <button id="printBtn" class="secondary-button">
+          <i class="print-icon">🖨️</i> Print Timetable
+        </button>
+      </div>
+    </header>
+
+    <div class="filters">
+      <!-- Year Buttons -->
+      <div id="year-buttons" class="button-group">
+        <button id="firstYearBtn">First Year</button>
+        <button id="secondYearBtn">Second Year</button>
+        <button id="thirdYearBtn">Third Year</button>
+        <button id="fourthYearBtn">Fourth Year</button>
+        <button id="allYearsBtn">All Years</button>
+      </div>
+
+      <!-- Semester Buttons -->
+      <div id="semester-buttons" class="button-group" style="display: none;">
+        <button id="oddSemBtn">Odd Semester</button>
+        <button id="evenSemBtn">Even Semester</button>
+      </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="loading" style="display: none;">
+      <div class="spinner"></div>
+      <p>Generating timetable...</p>
+    </div>
+
+    <!-- Timetable -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>YEAR</th>
+            <th>BRANCH</th>
+            <th>COURSE</th>
+            <th>TEACHER</th>
+            <th>ROOM</th>
+            <th>DAY</th>
+            <th>TYPE</th>
+            <th>TIME</th>
+          </tr>
+        </thead>
+        <tbody id="timetable-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

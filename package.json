@@ -1,0 +1,18 @@
+{
+  "name": "timetable-generation",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node --max-old-space-size=4096 server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "uuid": "^11.1.0"
+  },
+  "description": ""
+}
