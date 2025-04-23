@@ -4,10 +4,17 @@ const path = require('path');
 const { geneticAlgorithm } = require("./timetable_schedular/genetic_algorithm");
 const courseRoutes = require('./routes/courses');
 const db = require('./models/db');
+const hardcodedDB = require('./hardcoded/db')
 const facultyDB = require('./models/faculty_db');
+const hardcodedFacultyDB = require('./hardcoded/faculty_db');
 const { v4: uuidv4 } = require('uuid');
 const app = express();
+const MongoClient = require("mongodb").MongoClient;
+const dotenv = require('dotenv');
+dotenv.config();
+const mongoose = require('mongoose');
 const PORT = 3000;
+const GlobalData = require('./schema/coursesSchema');
 
 // Memory-saving measures
 global.gc && global.gc(); // Force garbage collection if available
@@ -442,9 +449,49 @@ process.on('uncaughtException', (err) => {
     // Keep the server running despite errors
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.post('/api/bulk-upload-data', async (req, res) => {
+  try {
+    await bulkUploadData();
+    res.json({ success: true, message: 'data uploaded successfully' });
+  } catch (err) {
+    console.error('Error uploading data:', err);
+    res.status(500).json({ success: false, error: 'Error uploading data' });
+  }
 });
 
-// 
+// Function to bulk insert course data into the database
+const bulkUploadData = async () => {
+  try {
+    const {branches, EvenCourses, classrooms, labs} = hardcodedDB
+    const newGlobalDoc = new GlobalData({
+      branches,
+      classrooms,
+      labs,
+      EvenCourses,
+      faculty: hardcodedFacultyDB.teachers,
+    });
+
+    await newGlobalDoc.save(); // Save to MongoDB
+    console.log('data uploaded successfully');
+  } catch (err) {
+    console.error('Error uploading data:', err);
+  }
+};
+
+// Mongo connection and server start
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(async () => {
+  console.log('MongoDB connected');
+
+  // Wait for both modules to finish loading data
+  await Promise.all([db.ready, facultyDB.ready]);
+
+  console.log("Courses data from database: ", db);
+  console.log("Faculty data from database: ", facultyDB);
+
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}).catch(err => {
+  console.error('MongoDB connection error:', err);
+});
