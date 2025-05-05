@@ -83,6 +83,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
+
 // Function to sort timetable: First by day, then by time
 function sortTimetable(timetable) {
     if (!Array.isArray(timetable)) {
@@ -259,6 +260,11 @@ async function displayStructuredTimetable() {
 
         const container = document.querySelector('.table-container');
         container.innerHTML = ''; // Clear existing content
+                // ─── pull in the user's workingDays from the server ───
+                const cfgResponse = await fetch('/api/constraints');
+                const cfg         = await cfgResponse.json();
+                const days        = cfg.workingDays;   // e.g. ["Monday",…,"Saturday"]
+        
 
         const years = ["firstYear", "secondYear", "thirdYear", "fourthYear"];
         const yearNames = {
@@ -283,17 +289,13 @@ async function displayStructuredTimetable() {
                         <h3>${branch}</h3>
                         <table style="width: 100%; border-collapse: collapse; border: 1px solid #ccc;">
     <thead>
-        <tr>
-            <th style="border: 1px solid #000; padding: 8px;">Time</th>
-            <th style="border: 1px solid #000; padding: 8px;">Monday</th>
-            <th style="border: 1px solid #000; padding: 8px;">Tuesday</th>
-            <th style="border: 1px solid #000; padding: 8px;">Wednesday</th>
-            <th style="border: 1px solid #000; padding: 8px;">Thursday</th>
-            <th style="border: 1px solid #000; padding: 8px;">Friday</th>
-        </tr>
+         <tr>
++            <th>Time</th>
++            ${days.map(d => `<th style="border:1px solid #000; padding:8px;">${d}</th>`).join('')}
++        </tr>
     </thead>
     <tbody>
-        ${generateBranchTimetableRows(data.data[year][branch])}
+        ${generateBranchTimetableRows(data.data[year][branch],days)}
     </tbody>
 </table>
 
@@ -314,8 +316,8 @@ async function displayStructuredTimetable() {
     }
 }
 
-function generateBranchTimetableRows(branchData) {
-    const days = ["Monday","Tuesday","Wednesday","Thursday","Friday"];
+function generateBranchTimetableRows(branchData,days) {
+    
     const timeSlots = Array.from(
       days.reduce((s,d)=> {
         (branchData[d]||[]).forEach(e=>s.add(e.time));
@@ -396,7 +398,7 @@ function handlePrint() {
 document.addEventListener('dragstart', e => {
     // climb up from whatever inner node you clicked to the <td draggable="true">
     const td = e.target.closest('td[draggable="true"]');
-    if (!td) return;               // if it wasn’t a draggable cell, ignore
+    if (!td) return;               // if it wasn't a draggable cell, ignore
     const id = td.dataset.entryId; // data-entry-id → dataset.entryId
     if (id) {
       e.dataTransfer.setData('text/plain', id);
@@ -445,4 +447,119 @@ document.addEventListener('dragover', e => {
       alert('Cannot move: ' + resp.error);      // show first conflict
     }
   });
+  
+// ─── Load settings from server ───────────────────────────────────────────
+// ─── Load settings from server ───────────────────────────────────────────
+async function loadConstraints() {
+    const res = await fetch('/api/constraints');
+    const data = await res.json();
+    return {
+      workingDays: data.workingDays || data.parameters.days,             // fallback if you only have parameters.days
+      workingHours: data.workingHours,
+      lunchBreak: data.lunchBreak,
+      maxClassesPerTeacherPerDay: data.maxClassesPerTeacherPerDay || 5,   // pick a default
+      noBackToBackSameCourse: data.noBackToBackSameCourse || false,
+      sessionRules: data.sessionRules || {
+        non:  { duration:1, weeklyCount:3 },
+        lab:  { duration:1, weeklyCount:2 },
+        both: { duration:2, weeklyCount:4 }
+      }
+    };
+  }
+  
+  
+  // ─── Open modal & populate fields ────────────────────────────────────────
+  function openConstraintsModal(cfg) {
+    console.log("Loaded constraints:", cfg);
+
+    // days:
+    ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+      .forEach(d => {
+        document.getElementById(`day-${d}`).checked = cfg.workingDays.includes(d);
+      });
+    // hours & lunch:
+    document.getElementById('workStart').value = cfg.workingHours.start;
+    document.getElementById('workEnd').value   = cfg.workingHours.end;
+    document.getElementById('lunchStart').value= cfg.lunchBreak.start;
+    document.getElementById('lunchEnd').value  = cfg.lunchBreak.end;
+    // load & back-to-back:
+    document.getElementById('maxClasses').value      = cfg.maxClassesPerTeacherPerDay;
+    document.getElementById('noBackToBack').checked  = cfg.noBackToBackSameCourse;
+    // session rules:
+    document.getElementById('theoryDuration').value = cfg.sessionRules?.non?.duration ?? 1;
+    document.getElementById('theoryCount').value    = cfg.sessionRules?.non?.weeklyCount ?? 3;
+    document.getElementById('labDuration').value    = cfg.sessionRules?.lab?.duration ?? 1;
+    document.getElementById('labCount').value       = cfg.sessionRules?.lab?.weeklyCount ?? 2;
+    document.getElementById('bothDuration').value   = cfg.sessionRules?.both?.duration ?? 2;
+    document.getElementById('bothCount').value      = cfg.sessionRules?.both?.weeklyCount ?? 4;
+  
+    document.getElementById('constraintsModal').style.display = 'block';
+  }
+  
+  // ─── Close modal ─────────────────────────────────────────────────────────
+  document.getElementById('closeModal')
+    .addEventListener('click', () => {
+      document.getElementById('constraintsModal').style.display = 'none';
+    });
+  
+  // ─── When user clicks "⚙️ Constraints Settings" ─────────────────────────
+  document.getElementById('manageConstraintsBtn')
+    .addEventListener('click', async () => {
+      const cfg = await loadConstraints();
+      openConstraintsModal(cfg);
+    });
+  
+  // ─── Gather user edits & send back ────────────────────────────────────────
+  async function saveConstraints() {
+    // 1) collect days
+    const workingDays = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+      .filter(d => document.getElementById(`day-${d}`).checked);
+  
+    // 2) build updates object
+    const updates = {
+      workingDays,
+      workingHours: {
+        start: document.getElementById('workStart').value,
+        end:   document.getElementById('workEnd').value
+      },
+      lunchBreak: {
+        start: document.getElementById('lunchStart').value,
+        end:   document.getElementById('lunchEnd').value
+      },
+      maxClassesPerTeacherPerDay: Number(document.getElementById('maxClasses').value),
+      noBackToBackSameCourse:    document.getElementById('noBackToBack').checked,
+      sessionRules: {
+        non: {
+          duration:    Number(document.getElementById('theoryDuration').value),
+          weeklyCount: Number(document.getElementById('theoryCount').value)
+        },
+        lab: {
+          duration:    Number(document.getElementById('labDuration').value),
+          weeklyCount: Number(document.getElementById('labCount').value)
+        },
+        both: {
+          duration:    Number(document.getElementById('bothDuration').value),
+          weeklyCount: Number(document.getElementById('bothCount').value)
+        }
+      }
+    };
+  
+    // 3) send to server
+    const resp = await fetch('/api/constraints', {
+      method: 'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(updates)
+    });
+    const data = await resp.json();
+    if (data.success) {
+      alert('Constraints saved!');
+      document.getElementById('constraintsModal').style.display = 'none';
+    } else {
+      alert('Error: ' + data.error);
+    }
+  }
+  
+  document.getElementById('saveConstraintsBtn')
+    .addEventListener('click', saveConstraints);
+  
   

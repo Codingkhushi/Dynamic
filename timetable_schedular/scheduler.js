@@ -3,9 +3,9 @@ console.log("Scheduler script started...");
 
 const { geneticAlgorithm } = require("./genetic_algorithm");
 
-(async () => {
+;(async () => {
   try {
-    const timetable = geneticAlgorithm();
+    const timetable = await geneticAlgorithm();
     console.log("Generated Timetable:", JSON.stringify(timetable, null, 2));
 
     // Format the timetable into a structured array for console.table()

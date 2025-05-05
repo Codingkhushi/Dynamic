@@ -14,7 +14,7 @@ app.get("/", (req, res) => {
     res.sendFile(__dirname + "/public/index.html");
 });
 
-app.post('/generate-timetable', (req, res) => {
+app.post('/generate-timetable', async(req, res) => {
     const { branch, year, visitingTeachers } = req.body;
 
     // Add visiting teachers to the database
@@ -27,7 +27,7 @@ app.post('/generate-timetable', (req, res) => {
     });
 
     try {
-        const timetable = scheduler.generateTimetable();
+        const timetable = await scheduler.generateTimetable();
         res.status(200).json({ message: 'Timetable generated successfully', timetable });
     } catch (error) {
         console.error(error);

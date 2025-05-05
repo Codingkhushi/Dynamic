@@ -15,6 +15,7 @@ dotenv.config();
 const mongoose = require('mongoose');
 const PORT = 3000;
 const GlobalData = require('./schema/coursesSchema');
+const Constraints = require('./models/constraintsSchema');
 
 // Memory-saving measures
 global.gc && global.gc(); // Force garbage collection if available
@@ -139,6 +140,31 @@ try {
     console.error("Error in initial timetable setup:", error);
 }
 
+// ─── Get or create the one Constraints doc ─────────────────────────────────
+// ─── Fetch current constraints (create defaults if none) ─────────────────
+app.get('/api/constraints', async (req, res) => {
+  let cfg = await Constraints.findOne();
+  if (!cfg) {
+    cfg = await new Constraints().save();    // first‐time defaults
+  }
+  res.json(cfg);
+});
+
+// ─── Save updated constraints from the UI ───────────────────────────────
+app.post('/api/constraints', async (req, res) => {
+  try {
+    const updates = req.body;                // expects the same shape as our schema
+    let cfg = await Constraints.findOne();
+    if (!cfg) cfg = new Constraints();
+    Object.assign(cfg, updates);
+    await cfg.save();
+    res.json({ success: true, config: cfg });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+
 // Generate new timetable with error handling
 app.post("/api/generate-timetable", async (req, res) => {
     console.log("Generate timetable request received");
@@ -150,20 +176,13 @@ app.post("/api/generate-timetable", async (req, res) => {
         });
         
         // Generate timetable with race against timeout
-        const generationPromise = new Promise((resolve, reject) => {
-            try {
-                const timetable = geneticAlgorithm();
-                if (!timetable || timetable.length === 0) {
-                    reject(new Error("Generated empty timetable"));
-                } else {
-                    resolve(timetable);
-                }
-            } catch (error) {
-                reject(error);
-            }
-        });
+        generatedTimetable = await Promise.race([
+          geneticAlgorithm(),
+          timeoutPromise
+        ]);
         
-        generatedTimetable = await Promise.race([generationPromise, timeoutPromise]);
+        
+       
         
         console.log(`Generated timetable with ${generatedTimetable.length} entries`);
         
@@ -301,13 +320,17 @@ app.get("/", (req, res) => {
 
 // --------------------------------------------------------------------
 // Get structured timetable data
-app.get("/api/structured-timetable", (req, res) => {
+app.get("/api/structured-timetable", async (req, res) => {
   try {
-    // 1) Define the years, branches, and weekdays
-    const years  = ["firstYear", "secondYear", "thirdYear", "fourthYear"];
-    const days   = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-    const branches = db.branches; // ["CST","CE","IT","DS","AI","ENC"]
+    // 0) Load user’s day‐settings
+    let cfg = await Constraints.findOne();
+    if (!cfg) cfg = await new Constraints().save();
+    const days = cfg.workingDays;   // e.g. ["Monday","Tuesday",…,"Saturday"]
 
+    // 1) Define the years, branches, and weekdays
+    const years   = ["firstYear", "secondYear", "thirdYear", "fourthYear"];
+    const branches = db.branches; // ["CST","CE",…]
+    
     // 2) Build the empty container
     const structuredTimetable = {};
     years.forEach(year => {
@@ -320,7 +343,7 @@ app.get("/api/structured-timetable", (req, res) => {
       });
     });
 
-    // 3) Populate with every entry, preserving its id
+    // 3) Populate with every entry
     generatedTimetable.forEach(entry => {
       const { year, branch, day, time, course, teacher, room, type, id } = entry;
       if (
@@ -329,8 +352,8 @@ app.get("/api/structured-timetable", (req, res) => {
         Array.isArray(structuredTimetable[year][branch][day])
       ) {
         structuredTimetable[year][branch][day].push({
-          id,                   // ← include the unique identifier
-          subject: course,      // rename for front-end
+          id,
+          subject: course,
           faculty: teacher,
           room,
           type,
@@ -339,7 +362,7 @@ app.get("/api/structured-timetable", (req, res) => {
       }
     });
 
-    // 4) Sort each day by the start time (e.g. “08:30-09:30” → compare “08:30”)
+    // 4) Sort each day by start time
     years.forEach(year => {
       branches.forEach(branch => {
         days.forEach(day => {
@@ -352,7 +375,7 @@ app.get("/api/structured-timetable", (req, res) => {
       });
     });
 
-    // 5) Return the result
+    // 5) Return
     res.json({
       success: true,
       data: structuredTimetable

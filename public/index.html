@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>UMIT Timetable Generator</title>
   <link rel="stylesheet" href="styles.css" />
+  <!-- Defer ensures script.js runs only after the DOM is fully parsed -->
+  <script src="script.js" defer></script>
 </head>
 <body>
   <div class="container">
@@ -15,11 +17,11 @@
         <button id="printBtn" class="secondary-button">
           <i class="print-icon">🖨️</i> Print Timetable
         </button>
+        <button id="manageConstraintsBtn" class="secondary-button">⚙️ Constraints Settings</button>
       </div>
     </header>
 
     <div class="filters">
-      <!-- Year Buttons -->
       <div id="year-buttons" class="button-group">
         <button id="firstYearBtn">First Year</button>
         <button id="secondYearBtn">Second Year</button>
@@ -27,21 +29,17 @@
         <button id="fourthYearBtn">Fourth Year</button>
         <button id="allYearsBtn">All Years</button>
       </div>
-
-      <!-- Semester Buttons -->
       <div id="semester-buttons" class="button-group" style="display: none;">
         <button id="oddSemBtn">Odd Semester</button>
         <button id="evenSemBtn">Even Semester</button>
       </div>
     </div>
 
-    <!-- Loading Spinner -->
     <div id="loading" class="loading" style="display: none;">
       <div class="spinner"></div>
       <p>Generating timetable...</p>
     </div>
 
-    <!-- Timetable -->
     <div class="table-container">
       <table>
         <thead>
@@ -61,6 +59,107 @@
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <!-- Constraints Settings Modal -->
+  <<!-- index.html (just the modal part) -->
+<div id="constraintsModal" class="modal">
+  <div class="modal-content">
+    <header class="modal-header">
+      <h2>Timetable Constraints Configuration</h2>
+      <button id="closeModal" class="close-btn">&times;</button>
+    </header>
+    <form id="constraintsForm" class="constraints-form">
+      <!-- Working Days -->
+      <div class="form-group">
+        <label class="form-label">Working Days</label>
+        <div class="checkbox-group">
+          <label><input type="checkbox" id="day-Monday"> Mon</label>
+          <label><input type="checkbox" id="day-Tuesday"> Tue</label>
+          <label><input type="checkbox" id="day-Wednesday"> Wed</label>
+          <label><input type="checkbox" id="day-Thursday"> Thu</label>
+          <label><input type="checkbox" id="day-Friday"> Fri</label>
+          <label><input type="checkbox" id="day-Saturday"> Sat</label>
+          <label><input type="checkbox" id="day-Sunday"> Sun</label>
+        </div>
+      </div>
+
+      <!-- Working Hours -->
+      <div class="form-group grid-2">
+        <div>
+          <label class="form-label" for="workStart">Work Start</label>
+          <input type="time" id="workStart">
+        </div>
+        <div>
+          <label class="form-label" for="workEnd">Work End</label>
+          <input type="time" id="workEnd">
+        </div>
+      </div>
+
+      <!-- Lunch Break -->
+      <div class="form-group grid-2">
+        <div>
+          <label class="form-label" for="lunchStart">Lunch From</label>
+          <input type="time" id="lunchStart">
+        </div>
+        <div>
+          <label class="form-label" for="lunchEnd">Lunch To</label>
+          <input type="time" id="lunchEnd">
+        </div>
+      </div>
+
+      <!-- Teacher Constraints -->
+      <div class="form-group grid-2">
+        <div>
+          <label class="form-label" for="maxClasses">Max classes/day</label>
+          <input type="number" id="maxClasses" min="1">
+        </div>
+        <div class="align-bottom">
+          <label><input type="checkbox" id="noBackToBack"> No back-to-back same course</label>
+        </div>
+      </div>
+
+      <!-- Per-Teacher Load -->
+      <div class="form-group">
+        <label class="form-label">Per-Teacher Daily Load</label>
+        <div id="teacher-load-settings" class="teacher-load-grid">
+          <!-- JS will inject each teacher’s numeric input here -->
+        </div>
+      </div>
+
+      <!-- Session Rules -->
+      <div class="form-group grid-2">
+        <div>
+          <label class="form-label">Theory (hrs/week)</label>
+          <div class="sub-inputs">
+            <input type="number" id="theoryDuration" step="0.5" placeholder="hrs">
+            <input type="number" id="theoryCount" placeholder="count">
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Lab (hrs/week)</label>
+          <div class="sub-inputs">
+            <input type="number" id="labDuration" step="0.5" placeholder="hrs">
+            <input type="number" id="labCount" placeholder="count">
+          </div>
+        </div>
+      </div>
+      <div class="form-group grid-2">
+        <div>
+          <label class="form-label">Both (hrs/week)</label>
+          <div class="sub-inputs">
+            <input type="number" id="bothDuration" step="0.5" placeholder="hrs">
+            <input type="number" id="bothCount" placeholder="count">
+          </div>
+        </div>
+        <!-- empty cell for symmetry -->
+        <div></div>
+      </div>
+
+      <footer class="modal-footer">
+        <button id="saveConstraintsBtn" type="button" class="primary-button">Save Changes</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
 </body>
 </html>

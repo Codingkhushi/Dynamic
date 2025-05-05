@@ -1,4 +1,16 @@
-function applyConstraints(timetable) {
+const db = require('../models/db');
+const Constraints = require('../models/constraintsSchema');
+async function loadConfig() {
+  return (await Constraints.findOne()) || await new Constraints().save();
+}
+// helper to parse “HH:MM” → decimal hours
+function parseTime(t) {
+  const [h,m] = t.split(':').map(Number);
+  return h + m/60;
+}
+
+async function applyConstraints(timetable) {
+    const cfg = await loadConfig(); 
     const teacherSchedule = {};
     const roomSchedule = {};
     const labSchedule = {};
@@ -35,49 +47,50 @@ function applyConstraints(timetable) {
 
         // 4. Teacher Workload Limits (e.g., max 5 classes per day)
         const teacherDayKey = `${day}-${teacher}`;
-        if (!teacherWorkload[teacherDayKey]) teacherWorkload[teacherDayKey] = 0;
-        teacherWorkload[teacherDayKey]++;
-        if (teacherWorkload[teacherDayKey] > 5) {
-            throw new Error(`Teacher ${teacher} exceeds daily workload limit on ${day}.`);
+            if (!teacherWorkload[teacherDayKey]) teacherWorkload[teacherDayKey] = 0;
+            teacherWorkload[teacherDayKey]++;
+            if (cfg.maxClassesPerTeacherPerDay) {
+              if (teacherWorkload[teacherDayKey] > cfg.maxClassesPerTeacherPerDay) {
+                throw new Error(
+                  `Teacher ${teacher} exceeds daily limit (${cfg.maxClassesPerTeacherPerDay}) on ${day}.`
+                );
+              }
         }
-
         // 5. Course Repetition Rules (Avoid back-to-back same course)
-        const courseKey = `${day}-${course}`;
-        if (courseLastScheduled[courseKey] === time) {
-            throw new Error(`Course ${course} is scheduled consecutively on ${day}.`);
-        }
-        courseLastScheduled[courseKey] = time;
+       // 5. Course Repetition (optional via cfg)
+    const courseKey = `${day}-${course}`;
+    if (cfg.noBackToBackSameCourse) {
+      if (courseLastScheduled[courseKey] === time) {
+        throw new Error(`Course ${course} is scheduled consecutively on ${day}.`);
+      }
+    }
+    courseLastScheduled[courseKey] = time;
 
-        // 6. Ensure project and non-theory subjects have only 1 lecture per week
-        if (!courseCount[course]) courseCount[course] = 0;
-        courseCount[course]++;
-        if (course === "Project" || type === "non") {
-            if (courseCount[course] > 1) {
-                throw new Error(`Course ${course} exceeds the limit of 1 lecture per week.`);
-            }
+        // 6–8. Dynamic session rules (duration & weekly count)
+        const rule = cfg.sessionRules[type] || {};
+    
+        // weekly count
+        courseCount[course] = (courseCount[course] || 0) + 1;
+        if (rule.weeklyCount && courseCount[course] > rule.weeklyCount) {
+          throw new Error(
+            `Course ${course} exceeds ${rule.weeklyCount} sessions/week for type '${type}'.`
+          );
+        }
+    
+        // duration
+        if (rule.duration) {
+          const [start, end] = time.split('-');
+          const diff = parseTime(end) - parseTime(start);
+          if (diff !== rule.duration) {
+            throw new Error(
+              `Course ${course} must have a ${rule.duration}-hour session.`
+            );
+          }
         }
 
-        // 7. Ensure theory and lab subjects have 3 lectures and 1 lab session per week
-        if (type === "both") {
-            if (courseCount[course] > 4) {
-                throw new Error(`Course ${course} exceeds the limit of 3 lectures and 1 lab session per week.`);
-            }
-        }
-
-        // 8. Ensure all theory lectures are 1 hour long and in classrooms
-        if (type === "non" || type === "lab" || type === "both") {
-            if (!db.classrooms.some(classroom => classroom.name === room)) {
-                throw new Error(`Course ${course} must be scheduled in a classroom.`);
-            }
-            if (time.split('-')[1] - time.split('-')[0] !== 1) {
-                throw new Error(`Course ${course} must have a 1-hour lecture.`);
-            }
-        }
-
-        // 9. Ensure consistent breaks (e.g., lunch break)
-        if (time === "12:30-01:15") {
-            throw new Error(`Time slot ${time} is reserved for lunch break.`);
-        }
+        if (`${time}` === `${cfg.lunchBreak.start}-${cfg.lunchBreak.end}`) {
+                  throw new Error(`Time slot ${time} is reserved for lunch break.`);
+                }
     });
 }
 
