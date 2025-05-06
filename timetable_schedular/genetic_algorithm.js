@@ -345,13 +345,40 @@ function selectParent(population) {
 }
 
 function crossover(parent1, parent2) {
-  const crossoverPoint = Math.floor(Math.random() * parent1.timetable.length);
-  const childTimetable = [
-    ...parent1.timetable.slice(0, crossoverPoint),
-    ...parent2.timetable.slice(crossoverPoint)
-  ];
+  // Group entries by branch and year
+  const groupedEntries1 = {};
+  const groupedEntries2 = {};
+  
+  parent1.timetable.forEach(entry => {
+      const key = `${entry.branch}-${entry.year}`;
+      if (!groupedEntries1[key]) groupedEntries1[key] = [];
+      groupedEntries1[key].push(entry);
+  });
+  
+  parent2.timetable.forEach(entry => {
+      const key = `${entry.branch}-${entry.year}`;
+      if (!groupedEntries2[key]) groupedEntries2[key] = [];
+      groupedEntries2[key].push(entry);
+  });
+  
+  // Create child by taking segments from both parents
+  const childTimetable = [];
+  const groups = Object.keys(groupedEntries1);
+  
+  groups.forEach(group => {
+      // Random selection from which parent to take this group
+      if (Math.random() < 0.5 && groupedEntries1[group]) {
+          childTimetable.push(...groupedEntries1[group]);
+      } else if (groupedEntries2[group]) {
+          childTimetable.push(...groupedEntries2[group]);
+      }
+  });
+  
   const fitnessResult = calculateEnhancedFitness(childTimetable);
-  return { timetable: childTimetable, fitness: fitnessResult.score };
+  return {
+      timetable: childTimetable,
+      fitness: fitnessResult.score
+  };
 }
 
 function mutate(individual) {
